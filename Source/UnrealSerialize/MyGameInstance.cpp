@@ -3,6 +3,7 @@
 
 #include "MyGameInstance.h"
 #include "Student.h"
+#include "JsonObjectConverter.h"
 
 UMyGameInstance::UMyGameInstance()
 {
@@ -69,19 +70,23 @@ void UMyGameInstance::Init()
 		FMemoryWriter MemoryWriterAr(BufferArray);
 		StudentSrc->Serialize(MemoryWriterAr);
 
-		TUniquePtr<FArchive> FileWriterAr = TUniquePtr<FArchive>(IFileManager::Get().CreateFileWriter(*ObjcetDataAbsolutePath));
-		if (FileWriterAr != nullptr)
 		{
-			*FileWriterAr << BufferArray;
-			FileWriterAr->Close();
+			TUniquePtr<FArchive> FileWriterAr = TUniquePtr<FArchive>(IFileManager::Get().CreateFileWriter(*ObjcetDataAbsolutePath));
+			if (FileWriterAr != nullptr)
+			{
+				*FileWriterAr << BufferArray;
+				FileWriterAr->Close();
+			}
 		}
 		
 		TArray<uint8> BufferArrayFromFile;
-		TUniquePtr<FArchive> FileReaderAr = TUniquePtr<FArchive>(IFileManager::Get().CreateFileReader(*ObjcetDataAbsolutePath));
-		if (FileReaderAr != nullptr)
 		{
-			*FileReaderAr << BufferArrayFromFile;
-			FileReaderAr->Close();
+			TUniquePtr<FArchive> FileReaderAr = TUniquePtr<FArchive>(IFileManager::Get().CreateFileReader(*ObjcetDataAbsolutePath));
+			if (FileReaderAr != nullptr)
+			{
+				*FileReaderAr << BufferArrayFromFile;
+				FileReaderAr->Close();
+			}
 		}
 
 		FMemoryReader  MemoryReaderAr(BufferArrayFromFile);
@@ -89,6 +94,39 @@ void UMyGameInstance::Init()
 		StudentDest->Serialize(MemoryReaderAr);
 
 		StudentDest->PrintInfo(TEXT("ObjectData"));
+	}
+
+	{
+		FString JsonDataFileName(TEXT("StudenJsonData.txt"));
+		FString JsonDataAbsolutePath = FPaths::Combine(*SavedDir, *JsonDataFileName);
+		FPaths::MakeStandardFilename(JsonDataAbsolutePath);
+
+		// TSharedRef의 사용법. MakeShared()를 이용하여 초기화한다.
+		TSharedRef<FJsonObject> JsonObjectSrc = MakeShared<FJsonObject>();
+		FJsonObjectConverter::UStructToJsonObject(StudentSrc->GetClass(), StudentSrc, JsonObjectSrc);
+
+		FString JsonOutString;
+		TSharedRef<TJsonWriter<TCHAR>> JsonWriterAr = TJsonWriterFactory<TCHAR>::Create(&JsonOutString);
+		if (FJsonSerializer::Serialize(JsonObjectSrc, JsonWriterAr))
+		{
+			// 성공했다면 json이 만들어졌따.
+			FFileHelper::SaveStringToFile(JsonOutString, *JsonDataAbsolutePath);
+		}
+
+		FString JsonInString;
+		FFileHelper::LoadFileToString(JsonInString, *JsonDataAbsolutePath);
+		
+		TSharedRef<TJsonReader<TCHAR>> JsonReaderAr = TJsonReaderFactory<TCHAR>::Create(JsonInString);
+		//읽어지지 않으면 null이 올 수 있기 때문에 ref아닌 ptr 사용한다.
+		TSharedPtr<FJsonObject> JsonObjectDest;
+		if (FJsonSerializer::Deserialize(JsonReaderAr, JsonObjectDest))
+		{
+			UStudent* JsonStudentDest = NewObject<UStudent>();
+			if (FJsonObjectConverter::JsonObjectToUStruct(JsonObjectDest.ToSharedRef(), JsonStudentDest->GetClass(), JsonStudentDest))
+			{
+				JsonStudentDest->PrintInfo(TEXT("JsonData"));
+			}
+		}
 	}
 		
 }
