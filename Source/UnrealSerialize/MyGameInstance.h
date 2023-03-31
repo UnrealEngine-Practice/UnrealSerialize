@@ -34,4 +34,8 @@ public:
 	UMyGameInstance();
 	
 	virtual void Init() override;
+
+private:
+	UPROPERTY()
+	TObjectPtr<class UStudent> StudentSrc;
 };

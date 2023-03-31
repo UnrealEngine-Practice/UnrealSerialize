@@ -2,6 +2,7 @@
 
 
 #include "MyGameInstance.h"
+#include "Student.h"
 
 UMyGameInstance::UMyGameInstance()
 {
@@ -49,6 +50,45 @@ void UMyGameInstance::Init()
 
 			UE_LOG(LogTemp, Log, TEXT("[RawData] 이름 %s 순번 %d"), *RawDataDest.Name, RawDataDest.Order);
 		}
-		
 	}
+
+	StudentSrc = NewObject<UStudent>();
+	StudentSrc->SetName(TEXT("김동호"));
+	StudentSrc->SetOrder(27);
+	{
+		const FString ObjectDataFileName(TEXT("ObjectData.bin"));
+		FString ObjcetDataAbsolutePath = FPaths::Combine(*SavedDir, *ObjectDataFileName);
+		FPaths::MakeStandardFilename(ObjcetDataAbsolutePath);
+
+		/*
+		 * 버퍼를 만들어주고, 아카이브를 해당 버퍼에 연결해준다.
+		 * 이후 아카이브를 Serialize함수에 전달하여 Student객체의 데이터가 BufferArray에 직렬화된 상태로 저장된다
+		 * 그 다음 파일로 버퍼를 저장한다.
+		 */
+		TArray<uint8> BufferArray;
+		FMemoryWriter MemoryWriterAr(BufferArray);
+		StudentSrc->Serialize(MemoryWriterAr);
+
+		TUniquePtr<FArchive> FileWriterAr = TUniquePtr<FArchive>(IFileManager::Get().CreateFileWriter(*ObjcetDataAbsolutePath));
+		if (FileWriterAr != nullptr)
+		{
+			*FileWriterAr << BufferArray;
+			FileWriterAr->Close();
+		}
+		
+		TArray<uint8> BufferArrayFromFile;
+		TUniquePtr<FArchive> FileReaderAr = TUniquePtr<FArchive>(IFileManager::Get().CreateFileReader(*ObjcetDataAbsolutePath));
+		if (FileReaderAr != nullptr)
+		{
+			*FileReaderAr << BufferArrayFromFile;
+			FileReaderAr->Close();
+		}
+
+		FMemoryReader  MemoryReaderAr(BufferArrayFromFile);
+		UStudent* StudentDest = NewObject<UStudent>();
+		StudentDest->Serialize(MemoryReaderAr);
+
+		StudentDest->PrintInfo(TEXT("ObjectData"));
+	}
+		
 }
